@@ -1,0 +1,55 @@
+@layer base {
+  * {
+    border-color: var(--color-kav-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 4rem;
+  }
+
+  body {
+    background-color: var(--color-kav-bg);
+    color: var(--color-kav-ivory);
+    font-family: var(--font-kav-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-kav-gold);
+    color: var(--color-kav-bg);
+  }
+
+  @media (hover: none) {
+    .product-card-tags {
+      max-height: 5rem;
+      opacity: 1;
+    }
+  }
+
+  /* Visible, on-brand focus ring for keyboard navigation (a11y) */
+  :focus-visible {
+    outline: 2px solid var(--color-kav-gold);
+    outline-offset: 4px;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-kav-display);
+    letter-spacing: -0.01em;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

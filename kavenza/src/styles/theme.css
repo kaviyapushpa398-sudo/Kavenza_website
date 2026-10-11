@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/*
+  KAVENZA Design System
+  ----------------------
+  Minimal Luxury + Modern Technology.
+  All brand tokens live here as CSS variables so they can be reused
+  outside Tailwind (inline styles, SVGs, etc.) and are also exposed
+  to Tailwind utilities via @theme below.
+*/
+
+:root {
+  /* Backgrounds */
+  --color-kav-bg: #0a0a09;
+  --color-kav-bg-elevated: #101010;
+  --color-kav-surface: #161513;
+  --color-kav-surface-hover: #1c1b18;
+
+  /* Gold / Sandal accent (matches logo) */
+  --color-kav-gold: #c8a874;
+  --color-kav-gold-soft: #e3cfa4;
+  --color-kav-gold-dim: #8a7350;
+
+  /* Typography */
+  --color-kav-ivory: #f4efe6;
+  --color-kav-secondary: #a39a8c;
+  --color-kav-muted: #898173;
+
+  /* Borders / dividers */
+  --color-kav-border: rgba(244, 239, 230, 0.09);
+  --color-kav-border-strong: rgba(244, 239, 230, 0.16);
+  --color-kav-border-gold: rgba(200, 168, 116, 0.35);
+
+  /* Typography scale helpers */
+  --font-kav-sans: "Inter", "Neue Haas Grotesk", system-ui, -apple-system, sans-serif;
+  --font-kav-display: "Marcellus", "Cormorant Garamond", "Inter", serif;
+
+  /* Motion */
+  --ease-kav: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Expose brand tokens as Tailwind utilities: bg-kav-bg, text-kav-ivory, border-kav-border, etc. */
+@theme {
+  --color-kav-bg: var(--color-kav-bg);
+  --color-kav-bg-elevated: var(--color-kav-bg-elevated);
+  --color-kav-surface: var(--color-kav-surface);
+  --color-kav-surface-hover: var(--color-kav-surface-hover);
+
+  --color-kav-gold: var(--color-kav-gold);
+  --color-kav-gold-soft: var(--color-kav-gold-soft);
+  --color-kav-gold-dim: var(--color-kav-gold-dim);
+
+  --color-kav-ivory: var(--color-kav-ivory);
+  --color-kav-secondary: var(--color-kav-secondary);
+  --color-kav-muted: var(--color-kav-muted);
+
+  --color-kav-border: var(--color-kav-border);
+  --color-kav-border-strong: var(--color-kav-border-strong);
+  --color-kav-border-gold: var(--color-kav-border-gold);
+
+  --font-sans: var(--font-kav-sans);
+  --font-display: var(--font-kav-display);
+}
