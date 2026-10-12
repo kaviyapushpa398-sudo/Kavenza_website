@@ -124,9 +124,50 @@ def create_app(test_config=None):
             return jsonify(error=errors[0]), 400
 
         mail_config = get_mail_config(app.config)
+
         if mail_config is None:
-            app.logger.error("Contact email configuration is incomplete or invalid.")
-            return jsonify(error="The contact service is not configured."), 503
+            required_keys = (
+                "MAIL_BUSINESS_EMAIL",
+                "SMTP_HOST",
+                "SMTP_USERNAME",
+                "SMTP_PASSWORD",
+                "SMTP_PORT",
+            )
+
+            missing_keys = [
+                key
+                for key in required_keys
+                if not isinstance(app.config.get(key), str)
+                or not app.config[key].strip()
+            ]
+
+            app.logger.error(
+                "Contact email configuration is invalid. "
+                "Missing or empty keys: %s",
+                ", ".join(missing_keys)
+                if missing_keys
+                else "None; check email format and SMTP port",
+            )
+
+            return jsonify(
+                error="The contact service is not configured."
+            ), 503
+
+        try:
+            send_contact_email(payload, mail_config)
+
+        except (OSError, smtplib.SMTPException) as error:
+            app.logger.error(
+                "Contact email delivery failed (error_type=%s).",
+                type(error).__name__,
+            )
+
+            return jsonify(
+                error="We could not send your message. Please try again later."
+            ), 502
+
+        return jsonify(status="sent"), 200
+        
 
         try:
             send_contact_email(payload, mail_config)
