@@ -1,3 +1,4 @@
+import socket
 import smtplib
 import sqlite3
 import tempfile
@@ -7,6 +8,7 @@ from unittest.mock import patch
 
 from backend.app import (
     create_app,
+    get_mail_config,
     send_business_inquiry_email,
     send_inquiry_confirmation_email,
     send_welcome_email,
@@ -65,7 +67,11 @@ class ContactEndpointTests(unittest.TestCase):
         smtp_factory.assert_called_once_with("smtp.example.test", 587, timeout=10)
         self.assertEqual(smtp.send_message.return_value, {})
         smtp.starttls.assert_called_once()
+        self.assertIsNotNone(smtp.starttls.call_args.kwargs["context"])
         smtp.login.assert_called_once_with("sender@example.test", "test-password")
+        method_names = [call[0] for call in smtp.method_calls]
+        self.assertLess(method_names.index("starttls"), method_names.index("login"))
+        self.assertLess(method_names.index("login"), method_names.index("send_message"))
         sent_email = smtp.send_message.call_args.args[0]
         self.assertEqual(sent_email["From"], "sender@example.test")
         self.assertEqual(sent_email["To"], "contact@example.test")
@@ -134,7 +140,98 @@ class ContactEndpointTests(unittest.TestCase):
         )
         self.assertNotIn("internal smtp detail", response.get_data(as_text=True))
         self.assertTrue(any("SMTPException" in message for message in captured.output))
-        self.assertNotIn("internal smtp detail", "\n".join(captured.output))
+        self.assertIn("internal smtp detail", "\n".join(captured.output))
+        self.assertIn("smtp_host=smtp.example.test, smtp_port=587", "\n".join(captured.output))
+
+    def test_smtp_connection_errors_log_sanitized_diagnostics(self):
+        failures = (
+            (
+                socket.gaierror(
+                    socket.EAI_AGAIN,
+                    "DNS lookup temporarily failed sender@example.test "
+                    "contact@example.test test-password test-session-secret",
+                ),
+                "DNS lookup",
+            ),
+            (
+                TimeoutError(
+                    "SMTP connection timed out sender@example.test "
+                    "contact@example.test test-password test-session-secret"
+                ),
+                "connection timed out",
+            ),
+            (
+                ConnectionRefusedError(
+                    "SMTP connection refused sender@example.test "
+                    "contact@example.test test-password test-session-secret"
+                ),
+                "connection refused",
+            ),
+        )
+        for error, diagnostic in failures:
+            with self.subTest(error=type(error).__name__):
+                with patch(
+                    "backend.app.send_contact_email", side_effect=error
+                ), self.assertLogs(self.app.logger.name, level="ERROR") as captured:
+                    response = self.client.post(
+                        "/api/contact", json=self.valid_payload(), headers=self.headers
+                    )
+
+                log_output = "\n".join(captured.output)
+                self.assertEqual(response.status_code, 502)
+                self.assertEqual(
+                    response.json,
+                    {"error": "We could not send your message. Please try again later."},
+                )
+                self.assertIn(type(error).__name__, log_output)
+                self.assertIn(diagnostic, log_output)
+                for sensitive_value in (
+                    "sender@example.test",
+                    "contact@example.test",
+                    "test-password",
+                    "test-session-secret",
+                ):
+                    self.assertNotIn(sensitive_value, log_output)
+
+    def test_gmail_mail_configuration_requires_valid_environment_values(self):
+        config = {
+            "MAIL_BUSINESS_EMAIL": "contact@gmail.com",
+            "SMTP_HOST": "smtp.gmail.com",
+            "SMTP_PORT": "587",
+            "SMTP_USERNAME": "sender@gmail.com",
+            "SMTP_PASSWORD": "gmail-app-password",
+        }
+        self.assertEqual(
+            get_mail_config(config),
+            {
+                "business_email": "contact@gmail.com",
+                "host": "smtp.gmail.com",
+                "port": 587,
+                "username": "sender@gmail.com",
+                "password": "gmail-app-password",
+            },
+        )
+
+        for field, invalid_value in (
+            ("MAIL_BUSINESS_EMAIL", "not-an-email"),
+            ("SMTP_PORT", "not-a-port"),
+            ("SMTP_PORT", "0"),
+            ("SMTP_PORT", "65536"),
+        ):
+            with self.subTest(field=field, value=invalid_value):
+                self.assertIsNone(
+                    get_mail_config({**config, field: invalid_value})
+                )
+
+        for field in (
+            "MAIL_BUSINESS_EMAIL",
+            "SMTP_HOST",
+            "SMTP_PORT",
+            "SMTP_USERNAME",
+            "SMTP_PASSWORD",
+        ):
+            with self.subTest(missing=field):
+                self.assertIsNone(get_mail_config({**config, field: ""}))
 
     def test_missing_email_configuration_returns_503_without_sending(self):
         self.app.config["SMTP_PASSWORD"] = ""

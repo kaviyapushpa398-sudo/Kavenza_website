@@ -132,8 +132,12 @@ def create_app(test_config=None):
             send_contact_email(payload, mail_config)
         except (OSError, smtplib.SMTPException) as error:
             app.logger.error(
-                "Contact email delivery failed (error_type=%s).",
+                "Contact email delivery failed "
+                "(error_type=%s, error_message=%s, smtp_host=%s, smtp_port=%s).",
                 type(error).__name__,
+                sanitize_smtp_error(error, app.config),
+                mail_config["host"],
+                mail_config["port"],
             )
             return jsonify(
                 error="We could not send your message. Please try again later."
@@ -1054,6 +1058,29 @@ def get_mail_config(config):
         "username": config["SMTP_USERNAME"],
         "password": config["SMTP_PASSWORD"],
     }
+
+
+def sanitize_smtp_error(error, config):
+    message = str(error)
+    sensitive_values = (
+        config.get("SMTP_PASSWORD"),
+        config.get("SMTP_USERNAME"),
+        config.get("MAIL_BUSINESS_EMAIL"),
+        config.get("SECRET_KEY"),
+    )
+    for value in sorted(
+        (value for value in sensitive_values if isinstance(value, str) and value),
+        key=len,
+        reverse=True,
+    ):
+        message = message.replace(value, "[redacted]")
+    message = re.sub(
+        r"(?i)\b[\w.!#$%&'*+/=?^`{|}~-]+@[\w.-]+\.[a-z]{2,}\b",
+        "[redacted-email]",
+        message,
+    )
+    message = " ".join(message.split())
+    return message[:300] or "No diagnostic message was provided."
 
 
 def send_email_message(email, mail_config):
