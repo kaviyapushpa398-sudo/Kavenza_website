@@ -136,6 +136,19 @@ class ContactEndpointTests(unittest.TestCase):
         self.assertTrue(any("SMTPException" in message for message in captured.output))
         self.assertNotIn("internal smtp detail", "\n".join(captured.output))
 
+    def test_missing_email_configuration_returns_503_without_sending(self):
+        self.app.config["SMTP_PASSWORD"] = ""
+        with patch("backend.app.smtplib.SMTP") as smtp_factory:
+            response = self.client.post(
+                "/api/contact", json=self.valid_payload(), headers=self.headers
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.json, {"error": "The contact service is not configured."}
+        )
+        smtp_factory.assert_not_called()
+
     def test_refused_recipient_returns_error_instead_of_success(self):
         with patch("backend.app.smtplib.SMTP") as smtp_factory:
             smtp = smtp_factory.return_value.__enter__.return_value
@@ -249,13 +262,14 @@ class ContactEndpointTests(unittest.TestCase):
         with patch(
             "backend.app.send_welcome_email",
             side_effect=smtplib.SMTPException("private provider detail"),
-        ):
+        ), self.assertLogs(self.app.logger.name, level="ERROR") as captured:
             response = self.client.post(
                 "/api/auth/register", json=self.registration_payload(), headers=self.headers
             )
         self.assertEqual(response.status_code, 201)
         self.assertFalse(response.json["emailSent"])
         self.assertNotIn("private provider detail", response.get_data(as_text=True))
+        self.assertNotIn("private provider detail", "\n".join(captured.output))
         with closing(sqlite3.connect(self.app.config["DATABASE_PATH"])) as connection:
             count = connection.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
         self.assertEqual(count, 1)
@@ -309,6 +323,13 @@ class ContactEndpointTests(unittest.TestCase):
         session_after_logout = self.client.get("/api/auth/session", headers=self.headers)
         self.assertEqual(session_after_logout.status_code, 200)
         self.assertEqual(session_after_logout.json, {"user": None})
+        self.assertEqual(
+            session_after_logout.headers["Access-Control-Allow-Origin"],
+            self.headers["Origin"],
+        )
+        self.assertEqual(
+            session_after_logout.headers["Access-Control-Allow-Credentials"], "true"
+        )
         self.assertEqual(
             self.client.get("/api/auth/dashboard", headers=self.headers).status_code, 401
         )

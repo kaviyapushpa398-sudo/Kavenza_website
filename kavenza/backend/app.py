@@ -127,21 +127,19 @@ def create_app(test_config=None):
         if mail_config is None:
             app.logger.error("Contact email configuration is incomplete or invalid.")
             return jsonify(error="The contact service is not configured."), 503
-        
 
         try:
             send_contact_email(payload, mail_config)
         except (OSError, smtplib.SMTPException) as error:
-          app.logger.error(
-        "Contact email delivery failed (error_type=%s, details=%s).",
-        type(error).__name__,
-        str(error)[:300],
-    )
-    return jsonify(
-        error="We could not send your message. Please try again later."
-    ), 502
+            app.logger.error(
+                "Contact email delivery failed (error_type=%s).",
+                type(error).__name__,
+            )
+            return jsonify(
+                error="We could not send your message. Please try again later."
+            ), 502
 
-    return jsonify(status="sent"), 200
+        return jsonify(status="sent"), 200
 
     @app.route("/api/auth/session", methods=["GET", "OPTIONS"])
     def auth_session():
@@ -231,8 +229,11 @@ def create_app(test_config=None):
             try:
                 send_welcome_email(payload["name"].strip(), normalized_email, mail_config)
                 email_sent = True
-            except (OSError, smtplib.SMTPException):
-                app.logger.exception("Welcome email sending failed for a newly registered customer.")
+            except (OSError, smtplib.SMTPException) as error:
+                app.logger.error(
+                    "Welcome email sending failed (error_type=%s).",
+                    type(error).__name__,
+                )
 
         return jsonify(
             status="created",

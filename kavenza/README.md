@@ -84,6 +84,30 @@ Deploy the Vite build and Flask API as separate services. Configure
 the frontend. Configure these variables on the Flask host (never in frontend
 code or a public build):
 
+For the current Render services, use these settings:
+
+- **Frontend static site** (root directory `kavenza`): build with
+  `npm ci && npm run build` and publish `dist`. Set
+  `VITE_CONTACT_API_URL=https://kavenza-backend.onrender.com` and
+  `SITE_URL=https://kavenza-website.onrender.com` as build environment
+  variables, then trigger a new build after changing either value.
+- **Backend web service** (root directory `kavenza/backend`): install with
+  `pip install -r requirements.txt` and start with
+  `gunicorn app:app --bind 0.0.0.0:$PORT`. The `.python-version` file selects
+  Python 3.12.10.
+- Set the backend's `CONTACT_ALLOWED_ORIGIN` to exactly
+  `https://kavenza-website.onrender.com`. Use `SESSION_COOKIE_SECURE=true`
+  over HTTPS and keep `SESSION_COOKIE_SAMESITE=Lax` for these same-site
+  Render origins.
+- Generate a long random `SECRET_KEY` and configure it in the backend service.
+  Keep the same value across restarts; do not set it as a frontend `VITE_`
+  variable. Store SMTP credentials only in the backend service's secret
+  environment variables.
+- Render's web-service filesystem is ephemeral. To retain customer accounts
+  across deploys, attach a persistent disk mounted at `/var/data` and set
+  `DATABASE_PATH=/var/data/kavenza.sqlite3`. Back up any existing database
+  before changing its path.
+
 - `CONTACT_ALLOWED_ORIGIN`: the exact HTTPS origin of the deployed frontend,
   with no path or trailing slash.
 - `MAIL_BUSINESS_EMAIL`: KAVENZA's SMTP-authorized business address, used as
